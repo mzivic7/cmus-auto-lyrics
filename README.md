@@ -7,9 +7,9 @@ Curses based lyrics display and fetcher for [cmus](https://cmus.github.io) music
 - Tries to guess song artist and title from file name and path  
 - Downloads lyrics from Genius (API token required)  
 - Downloads lyrics from azlyrics if Genius API token is not provided  
-- Saves lyrics, artist and title to tags (optional)  
-- Clears lyrics from section headers from Genius (optional)  
 - Automatically scrolls lyrics based on current position in song  
+- Saves lyrics, artist and title to tags (optional)  
+- Removes section headers from Genius lyrics (optional)  
 - Manual scroll deactivates auto scroll for current song  
 - Offline mode - forces only reading from tags  
 

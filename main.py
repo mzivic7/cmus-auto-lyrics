@@ -18,8 +18,8 @@ class UI:
         screen.nodelay(True)
         self.screen = screen
         self.lines = []
-        self.line_index = 0
-        self.line_index_old = 0
+        self.position = 0
+        self.position_old = 0
 
 
     def update_lyrics(self, lyrics):
@@ -30,14 +30,14 @@ class UI:
 
     def scroll(self, duration, position):
         """Scrolls lyrics to position given from song duration"""
-        self.line_index = int((position * len(self.lines) / duration))
-        if self.line_index_old != self.line_index:
-            self.line_index_old = self.line_index
+        line_index = int((position * len(self.lines) / duration))
+        h, _ = self.screen.getmaxyx()
+        self.position = max(0, line_index - int(h / 2))
+        if self.position != self.position_old:
+            self.position_old = self.position
             self.position = position
             self.duration = duration
             self.draw()
-        h, _ = self.screen.getmaxyx()
-        self.position = max(0, self.line_index - int(h / 2))
 
 
     def draw(self):
