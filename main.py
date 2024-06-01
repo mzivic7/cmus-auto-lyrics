@@ -51,10 +51,12 @@ class UI:
                     line = "  " + line[w - 1:]
                     line_num += 1
                 else:
+                    self.screen.refresh()
                     break
             if line_num < h:
                 self.screen.insstr(line_num, 0, line + "\n")
             else:
+                self.screen.refresh()
                 break
             line_num += 1
         self.screen.refresh()
