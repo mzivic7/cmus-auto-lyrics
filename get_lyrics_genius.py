@@ -43,9 +43,17 @@ def download(artist, title, token, clear_headers=False):
     lyrics_split = lyrics.split("\n")
     lyrics_new = ""
     for line in lyrics_split:
+        if len(line) > 500:
+            not_lyrics = True
+            break
         if any([x not in line for x in blacklist]):
             lyrics_new += line + "\n"
     lyrics = lyrics_new
+
+    # remove lyrics that has line longer than 500 characters
+    # its probably not lyrics
+    if not_lyrics:
+        return "Lyrics not found."
 
     # remove leading newlines
     while lyrics[:1] == "\n":

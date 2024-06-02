@@ -28,15 +28,13 @@ class UI:
         self.screen.clear()
 
 
-    def scroll(self, duration, position):
+    def scroll(self, song_duration, song_position):
         """Scrolls lyrics to position given from song duration"""
-        line_index = int((position * len(self.lines) / duration))
+        line_index = int((song_position * len(self.lines) / song_duration))
         h, _ = self.screen.getmaxyx()
         self.position = max(0, line_index - int(h / 2))
         if self.position != self.position_old:
             self.position_old = self.position
-            self.position = position
-            self.duration = duration
             self.draw()
 
 
