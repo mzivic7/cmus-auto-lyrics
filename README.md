@@ -32,6 +32,13 @@ options:
 
 ```
 
+### How to help it guess artist and title from path
+If there are no tags, keep file names as follows:  
+`<artist> - <title>.<extension>`  
+`<artist>-<title>.<extension>`  
+or file name is just song name and parent directory is artist:  
+`<artist>/<title>.<extension>`  
+
 ## Building
 1. Clone this repository: `git clone https://github.com/mzivic7/cmus-auto-lyrics`
 2. Install [pipenv](https://docs.pipenv.org/install/)
@@ -52,5 +59,9 @@ bash -c "tmux new-session -s cmus -d -x '$(tput cols)' -y '$(tput lines)' $'cmus
 Launching with maximized gnome terminal (can be added as launcher):  
 ```
 gnome-terminal --window --maximize -- /bin/sh -c "tmux new-session -s cmus -d -x '$(tput cols)' -y '$(tput lines)' $'cmus'; tmux split -h -l40 $'cmus-auto-lyrics -a'; tmux select-pane -t 0; tmux attach -t cmus"
+```
+Launching with [cmus-rpc-py](https://github.com/mzivic7/cmus-rpc-py):
+```
+bash -c "tmux new-session -s cmus -d -x '$(tput cols)' -y '$(tput lines)' $'cmus-rpc-py -s & cmus'; tmux split -h -l40 $'cmus-auto-lyrics -a'; tmux select-pane -t 0; tmux attach -t cmus"
 ```
 Note: change `-l40` to number of columns that should be used by lyrics pane.  

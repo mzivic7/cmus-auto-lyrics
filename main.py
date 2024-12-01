@@ -5,6 +5,7 @@ import argparse
 import signal
 import time
 import sys
+import os
 
 
 import get_lyrics_genius
@@ -84,7 +85,7 @@ class UI:
 
 def title_from_path(path):
     """Tries to get song artist and title from its path."""
-    song_name = path.rstrip(".m4a").rstrip(".mp3").split("/")
+    song_name = os.path.splitext(path)[0].strip("/").split("/")
     song_name_split = song_name[-1].split(" - ")
     if len(song_name_split) < 2:
         song_name_split = song_name[-1].split("-")
@@ -129,21 +130,22 @@ def get_lyrics(song_path, token, clear_headers=False, offline=False, artist=None
 
 def cmus_status():
     """Gets song path, duration and position from cmus-remote"""
-    proc = subprocess.Popen(['cmus-remote', '-Q'],
+    proc = subprocess.Popen(["cmus-remote", "-Q"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
     output, error = proc.communicate()
-    status = output.decode().split('\n')
+    if error:
+        print(error.decode())
+        return None, None, None
+    status = output.decode().split("\n")
     for line in status:
         line_split = line.split(" ")
-        if line_split[0] == 'file':
+        if line_split[0] == "file":
             song_path = line[5:]
-        elif line_split[0] == 'duration':
+        elif line_split[0] == "duration":
             duration = int(line_split[1:][0])
-        elif line_split[0] == 'position':
+        elif line_split[0] == "position":
             position = int(line_split[1:][0])
-    if error:
-        return None, None, None
     return song_path, duration, position
 
 
@@ -159,6 +161,7 @@ def fill_tags(song_path, lyrics, artist, title):
 
 
 def main(screen, args):
+    """Main function"""
     token = args.token
     clear_headers = args.clear_headers
     save_tags = args.save_tags
@@ -211,10 +214,11 @@ def main(screen, args):
         if key_pressed:
             disable_auto_scroll = True
         timer += 1
-        time.sleep(0.05)
+        time.sleep(delay)
 
 
 def sigint_handler(signum, frame):
+    """Handling Ctrl-C event"""
     sys.exit()
 
 
@@ -223,44 +227,44 @@ def argparser():
     parser = argparse.ArgumentParser(
         prog="cmus-auto-lyrics",
         description="Curses based lyrics display and fetcher for cmus music player"
-        )
+    )
     parser._positionals.title = "arguments"
     parser.add_argument(
         "token",
         nargs="?",
         default=None,
         help="Genius API token - if not provided, will use azlyrics"
-        )
+    )
     parser.add_argument(
         "-c",
         "--clear-headers",
         action="store_true",
         help="clear section headers in lyrics, applies only for genius"
-        )
+    )
     parser.add_argument(
         "-s",
         "--save-tags",
         action="store_true",
         help="save lyrics, artist, and title tags, if lyrics tag is missing"
-        )
+    )
     parser.add_argument(
         "-a",
         "--auto-scroll",
         action="store_true",
         help="automatically scroll lyrics based on current position in song"
-        )
+    )
     parser.add_argument(
         "-o",
         "--offline",
         action="store_true",
         help="runs in offline mode - only reads lyrics from tags"
-        )
+    )
     parser.add_argument(
         "-v",
         "--version",
         action="version",
-        version="%(prog)s 0.1.0"
-        )
+        version="%(prog)s 0.1.1"
+    )
     return parser.parse_args()
 
 
