@@ -1,18 +1,20 @@
-import music_tag
-import curses
-import subprocess
 import argparse
-import signal
-import time
-import sys
+import curses
 import os
+import signal
+import subprocess
+import sys
+import time
 
+import music_tag
 
-import get_lyrics_genius
 import get_lyrics_azlyrics
+import get_lyrics_genius
 
 
 class UI:
+    """Methods used to draw terminal user interface"""
+
     def __init__(self, screen):
         curses.use_default_colors()
         curses.curs_set(0)
@@ -120,11 +122,10 @@ def get_lyrics(song_path, token, clear_headers=False, offline=False, artist=None
     if not lyrics:
         if offline:
             lyrics = "No lyrics tag. Running in offline mode."
+        elif token:
+            lyrics = get_lyrics_genius.download(artist, title, token, clear_headers)
         else:
-            if token:
-                lyrics = get_lyrics_genius.download(artist, title, token, clear_headers)
-            else:
-                lyrics = get_lyrics_azlyrics.download(artist, title)
+            lyrics = get_lyrics_azlyrics.download(artist, title)
     return lyrics, artist, title
 
 
@@ -226,44 +227,44 @@ def argparser():
     """Sets up argument parser for CLI"""
     parser = argparse.ArgumentParser(
         prog="cmus-auto-lyrics",
-        description="Curses based lyrics display and fetcher for cmus music player"
+        description="Curses based lyrics display and fetcher for cmus music player",
     )
     parser._positionals.title = "arguments"
     parser.add_argument(
         "token",
         nargs="?",
         default=None,
-        help="Genius API token - if not provided, will use azlyrics"
+        help="Genius API token - if not provided, will use azlyrics",
     )
     parser.add_argument(
         "-c",
         "--clear-headers",
         action="store_true",
-        help="clear section headers in lyrics, applies only for genius"
+        help="clear section headers in lyrics, applies only for genius",
     )
     parser.add_argument(
         "-s",
         "--save-tags",
         action="store_true",
-        help="save lyrics, artist, and title tags, if lyrics tag is missing"
+        help="save lyrics, artist, and title tags, if lyrics tag is missing",
     )
     parser.add_argument(
         "-a",
         "--auto-scroll",
         action="store_true",
-        help="automatically scroll lyrics based on current position in song"
+        help="automatically scroll lyrics based on current position in song",
     )
     parser.add_argument(
         "-o",
         "--offline",
         action="store_true",
-        help="runs in offline mode - only reads lyrics from tags"
+        help="runs in offline mode - only reads lyrics from tags",
     )
     parser.add_argument(
         "-v",
         "--version",
         action="version",
-        version="%(prog)s 0.1.1"
+        version="%(prog)s 0.1.1",
     )
     return parser.parse_args()
 
@@ -272,3 +273,4 @@ if __name__ == "__main__":
     args = argparser()
     signal.signal(signal.SIGINT, sigint_handler)
     curses.wrapper(main, args)
+#
