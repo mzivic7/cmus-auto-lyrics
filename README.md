@@ -40,7 +40,7 @@ or file name is just song name and parent directory is artist:
 `<artist>/<title>.<extension>`  
 
 ## Installing
-- From AUR: yay -S cmus-auto-lyrics
+- From AUR: `yay -S cmus-auto-lyrics`
 - Build, then copy built executable to system:  
 `sudo cp dist/cmus-rpc-py /usr/local/sbin/`
 
