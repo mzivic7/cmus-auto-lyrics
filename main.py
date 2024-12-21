@@ -264,7 +264,7 @@ def argparser():
         "-v",
         "--version",
         action="version",
-        version="%(prog)s 0.1.1",
+        version="%(prog)s 0.1.2",
     )
     return parser.parse_args()
 
@@ -273,4 +273,3 @@ if __name__ == "__main__":
     args = argparser()
     signal.signal(signal.SIGINT, sigint_handler)
     curses.wrapper(main, args)
-#

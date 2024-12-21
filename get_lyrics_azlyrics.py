@@ -1,13 +1,15 @@
 from azlyrics.azlyrics import lyrics as lyrics_getter
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError as requests_ConnectionError
+
 # https://github.com/adhorrig/azlyrics
 
 
 def download(artist, title):
+    """Download lytics from azlyrics"""
     # download lyrics
     try:
         lyrics = lyrics_getter(artist, title)[0]
-    except ConnectionError:
+    except requests_ConnectionError:
         return "No internet connection."
     except Exception:
         return "Lyrics not found."

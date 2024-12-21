@@ -1,11 +1,13 @@
 import lyricsgenius
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError as requests_ConnectionError
+
 # https://github.com/johnwmillr/LyricsGenius
 
 blacklist = ["Contributors"]
 
 
 def download(artist, title, token, clear_headers=False):
+    """Download lyrics from genius, clear them and optionally remove headers (eg. [bridge])"""
     # setup genius
     if not token:
         return "No Genius API token provided."
@@ -24,7 +26,7 @@ def download(artist, title, token, clear_headers=False):
             genius_title = song.title
         except Exception:
             return "Lyrics not found."
-    except ConnectionError:
+    except requests_ConnectionError:
         return "No internet connection."
 
     # clean lyrics
