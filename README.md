@@ -39,16 +39,17 @@ If there are no tags, keep file names as follows:
 or file name is just song name and parent directory is artist:  
 `<artist>/<title>.<extension>`  
 
+## Installing
+- From AUR: yay -S cmus-auto-lyrics
+- Build, then copy built executable to system:  
+`sudo cp dist/cmus-rpc-py /usr/local/sbin/`
+
 ## Building
 1. Clone this repository: `git clone https://github.com/mzivic7/cmus-auto-lyrics`
 2. Install [pipenv](https://docs.pipenv.org/install/)
 3. `cd cmus-auto-lyrics`
 4. Install requirements: `pipenv install`
 5. build: `pipenv run python -m PyInstaller --noconfirm --onefile --windowed --clean --name "cmus-auto-lyrics" "main.py"`
-
-## Installing
-Copy built executable to system:  
-`sudo cp dist/cmus-auto-lyrics /usr/local/sbin/`  
 
 ## Launcher
 Example launcher for cmus with cmus-auto-lyrics in single terminal with tmux, with enabled auto-scroll.  
