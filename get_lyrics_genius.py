@@ -44,6 +44,7 @@ def download(artist, title, token, clear_headers=False):
     # remove lines containing blacklisted words
     lyrics_split = lyrics.split("\n")
     lyrics_new = ""
+    not_lyrics = False
     for line in lyrics_split:
         if len(line) > 500:
             not_lyrics = True
@@ -52,7 +53,7 @@ def download(artist, title, token, clear_headers=False):
             lyrics_new += line + "\n"
     lyrics = lyrics_new
 
-    # remove lyrics that has line longer than 500 characters
+    # remove lyrics with single line longer than 500 characters
     # its probably not lyrics
     if not_lyrics:
         return "Lyrics not found."
