@@ -41,6 +41,9 @@ def download(artist, title, token, clear_headers=False):
         if lyrics[-1] in str_numbers:
             lyrics = lyrics[:-1]
 
+    # remove double newline
+    lyrics = lyrics.replace("\n\n", "\n")
+
     # remove lines containing blacklisted words
     lyrics_split = lyrics.split("\n")
     lyrics_new = ""
