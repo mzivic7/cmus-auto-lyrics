@@ -11,6 +11,12 @@ import music_tag
 import get_lyrics_azlyrics
 import get_lyrics_genius
 
+NOT_LYRICS = (
+    "No internet connection.",
+    "No Genius API token provided.",
+    "No lyrics tag. Running in offline mode.",
+)
+
 
 class UI:
     """Methods used to draw terminal user interface"""
@@ -45,7 +51,8 @@ class UI:
         """Draws lyrics on screen"""
         h, w = self.screen.getmaxyx()
         line_num = 0
-        for line in self.lines[self.position:]:
+        for line_1 in self.lines[self.position:]:
+            line = line_1
             while len(line) >= w - 1:
                 if line_num < h:
                     self.screen.insstr(line_num, 0, line[:w-1] + "\n")
@@ -101,9 +108,11 @@ def title_from_path(path):
 
 
 def get_lyrics(song_path, token, clear_headers=False, offline=False, artist=None, title=None):
-    """Tries to get song lyrics from tags then from web,
+    """
+    Tries to get song lyrics from tags then from web,
     by reading artist and title from tags,
-    alternatively guessing them from song file path and name."""
+    alternatively guessing them from song file path and name.
+    """
     tags = music_tag.load_file(song_path)
     if len(str(tags["lyrics"])) > 12:
         lyrics = str(tags["lyrics"])
@@ -152,13 +161,15 @@ def cmus_status():
 
 def fill_tags(song_path, lyrics, artist, title):
     """Saves lyrics, artist, and title tags, if lyrics tag is missing."""
-    tags = music_tag.load_file(song_path)
-    if len(str(tags["lyrics"])) < 16:
-        tags["lyrics"] = lyrics
-        if not tags["artist"].first:
-            tags["artist"] = artist
-        if not tags["title"].first:
-            tags["title"] = title
+    if lyrics not in NOT_LYRICS:
+        tags = music_tag.load_file(song_path)
+        if len(str(tags["lyrics"])) < 16:
+            tags["lyrics"] = lyrics
+            if not tags["artist"].first:
+                tags["artist"] = artist
+            if not tags["title"].first:
+                tags["title"] = title
+            tags.save()
 
 
 def main(screen, args):
@@ -176,6 +187,8 @@ def main(screen, args):
     if not song_path:
         sys.exit()
     lyrics, artist, title = get_lyrics(song_path, token, clear_headers, offline)
+    if save_tags:
+        fill_tags(song_path, lyrics, artist, title)
     ui.update_lyrics(lyrics)
     ui.scroll(duration, position)
     ui.draw()
@@ -202,10 +215,7 @@ def main(screen, args):
             ui.draw()
             disable_auto_scroll = False
             if save_tags:
-                if lyrics not in ("No internet connection.",
-                                  "No Genius API token provided.",
-                                  "No lyrics tag. Running in offline mode."):
-                    fill_tags(song_path, lyrics, artist, title)
+                fill_tags(song_path, lyrics, artist, title)
         if auto_scroll and not disable_auto_scroll:
             if position != position_old:
                 position_old = position
@@ -218,7 +228,7 @@ def main(screen, args):
         time.sleep(delay)
 
 
-def sigint_handler(signum, frame):
+def sigint_handler(signum, frame):   # noqa
     """Handling Ctrl-C event"""
     sys.exit()
 
@@ -264,7 +274,7 @@ def argparser():
         "-v",
         "--version",
         action="version",
-        version="%(prog)s 0.1.3",
+        version="%(prog)s 0.1.4",
     )
     return parser.parse_args()
 
