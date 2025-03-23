@@ -5,6 +5,7 @@ import signal
 import subprocess
 import sys
 import time
+import re
 
 import music_tag
 
@@ -18,10 +19,194 @@ NOT_LYRICS = (
 )
 
 
+import curses
+import re
+
+class MinimalUI:
+    """Minimal UI that displays previous, current, and next line of lyrics with centered text"""
+
+    def __init__(self, screen):
+        curses.use_default_colors()
+        curses.curs_set(0)
+        screen.nodelay(True)
+        self.screen = screen
+        self.lines = []
+        self.current_line_idx = 0
+        self.last_displayed_idx = -1
+        # Regex pattern to match timestamp formats like [02:48.93]
+        self.timestamp_pattern = re.compile(r'\[(\d+):(\d+)\.(\d+)\]')
+        self.timestamps = []  # Will store timestamps in seconds for each line
+        
+        # Initialize colors if terminal supports them
+        self._setup_colors()
+
+    def _setup_colors(self):
+        """Setup color pairs for different line types"""
+        if curses.has_colors():
+            curses.start_color()
+            # Define color pairs: (pair_number, foreground, background)
+            # Pair 1: Current line (bright white on default background)
+            # LOG COLORS
+            curses.init_pair(1, curses.COLOR_YELLOW, -1)
+            # Pair 2: Inactive lines (dim gray on default background)
+            curses.init_pair(2, curses.COLOR_WHITE, -1)
+            
+            # Store attributes for easy access
+            self.current_line_attr = curses.color_pair(1) | curses.A_BOLD
+            self.inactive_line_attr = curses.color_pair(2)
+        else:
+            # Fallback for terminals without color support
+            self.current_line_attr = curses.A_BOLD
+            self.inactive_line_attr = curses.A_DIM
+
+    def update_lyrics(self, lyrics):
+        """Loads lyrics and extracts timestamps if available"""
+        self.lines = lyrics.split("\n")
+        self.current_line_idx = 0
+        self.last_displayed_idx = -1
+        self.timestamps = []
+        
+        # Extract timestamps from each line if available
+        for line in self.lines:
+            timestamp_match = self.timestamp_pattern.search(line)
+            if timestamp_match:
+                minutes, seconds, milliseconds = map(int, timestamp_match.groups())
+                time_in_seconds = minutes * 60 + seconds + milliseconds / 100
+                self.timestamps.append(time_in_seconds)
+            else:
+                self.timestamps.append(None)
+                
+        # Check if we have valid timestamps
+        self.has_timestamps = any(ts is not None for ts in self.timestamps)
+        self.screen.clear()
+
+    def scroll(self, song_duration, song_position):
+        """Determines current line based on song position using timestamps if available"""
+        if not self.lines or song_duration <= 0:
+            return
+        
+        # Use timestamps if available
+        if self.has_timestamps:
+            # Find the appropriate line based on current position
+            current_idx = 0
+            for i, timestamp in enumerate(self.timestamps):
+                if timestamp is not None and timestamp <= song_position:
+                    current_idx = i
+                elif timestamp is not None and timestamp > song_position:
+                    break
+            
+            self.current_line_idx = current_idx
+        else:
+            # Fall back to the original method if no timestamps
+            self.current_line_idx = int((song_position * len(self.lines) / song_duration))
+        
+        # Only redraw if the line has changed
+        if self.current_line_idx != self.last_displayed_idx:
+            self.last_displayed_idx = self.current_line_idx
+            self.draw()
+
+    def _clean_line(self, line):
+        """Remove timestamp suffixes from line"""
+        return self.timestamp_pattern.sub('', line).strip()
+
+    def draw(self):
+        """Draws previous, current, and next line on screen, centered horizontally"""
+        h, w = self.screen.getmaxyx()
+        self.screen.clear()
+        
+        # Center position for current line
+        current_line_pos = h // 2
+        prev_line_pos = current_line_pos - 2
+        next_line_pos = current_line_pos + 2
+        
+        # Draw previous line if available
+        if self.current_line_idx > 0:
+            prev_line = self._clean_line(self.lines[self.current_line_idx - 1])
+            self._draw_centered_line(prev_line, prev_line_pos, w, self.inactive_line_attr)
+        
+        # Draw current line
+        if 0 <= self.current_line_idx < len(self.lines):
+            current_line = self._clean_line(self.lines[self.current_line_idx])
+            self._draw_centered_line(current_line, current_line_pos, w, self.current_line_attr)
+            
+            # Draw next line if available
+            if self.current_line_idx + 1 < len(self.lines):
+                next_line = self._clean_line(self.lines[self.current_line_idx + 1])
+                self._draw_centered_line(next_line, next_line_pos, w, self.inactive_line_attr)
+        
+        self.screen.refresh()
+
+    def _draw_centered_line(self, line, y_pos, width, attr):
+        """Draw a line centered horizontally on the screen with specified attributes"""
+        if not line:  # Skip empty lines
+            return
+            
+        # If line is shorter than screen width, center it
+        if len(line) < width - 2:
+            x_pos = (width - len(line)) // 2
+            try:
+                self.screen.addstr(y_pos, x_pos, line, attr)
+            except curses.error:
+                # Handle potential curses errors when writing at screen boundaries
+                pass
+        else:
+            # For longer lines, we'll need to wrap and center each part
+            words = line.split()
+            current_line = ""
+            line_pos = y_pos
+            
+            for word in words:
+                # Check if adding this word would exceed screen width
+                if len(current_line) + len(word) + 1 < width - 2:
+                    if current_line:
+                        current_line += " " + word
+                    else:
+                        current_line = word
+                else:
+                    # Draw the current line centered
+                    if current_line:
+                        x_pos = (width - len(current_line)) // 2
+                        try:
+                            if line_pos < self.screen.getmaxyx()[0]:
+                                self.screen.addstr(line_pos, x_pos, current_line, attr)
+                        except curses.error:
+                            pass
+                        line_pos += 1
+                    current_line = word
+                    
+                    # Break if we've run out of vertical space
+                    if line_pos >= self.screen.getmaxyx()[0]:
+                        break
+            
+            # Draw the last line if there's anything left
+            if current_line and line_pos < self.screen.getmaxyx()[0]:
+                x_pos = (width - len(current_line)) // 2
+                try:
+                    self.screen.addstr(line_pos, x_pos, current_line, attr)
+                except curses.error:
+                    pass
+
+    def wait_input(self):
+        """Handles user input for manual scrolling"""
+        input_key = self.screen.getch()
+        if input_key == curses.KEY_UP:
+            if self.current_line_idx > 0:
+                self.current_line_idx -= 1
+                self.draw()
+                return True
+        elif input_key == curses.KEY_DOWN:
+            if self.current_line_idx < len(self.lines) - 1:
+                self.current_line_idx += 1
+                self.draw()
+                return True
+        return False
+
+
+
 class UI:
     """Methods used to draw terminal user interface"""
 
-    def __init__(self, screen, minimal=False):
+    def __init__(self, screen):
         curses.use_default_colors()
         curses.curs_set(0)
         screen.nodelay(True)
@@ -29,12 +214,13 @@ class UI:
         self.lines = []
         self.position = 0
         self.position_old = 0
-        self.minimal = minimal
+
 
     def update_lyrics(self, lyrics):
         """Loads lyrics"""
         self.lines = lyrics.split("\n")
         self.screen.clear()
+
 
     def scroll(self, song_duration, song_position):
         """Scrolls lyrics to position given from song duration"""
@@ -45,65 +231,30 @@ class UI:
             self.position_old = self.position
             self.draw()
 
+
     def draw(self):
         """Draws lyrics on screen"""
         h, w = self.screen.getmaxyx()
-        self.screen.clear()
-        
-        if self.minimal:
-            # Calculate the current line based on position and screen height
-            current_line_idx = self.position + int(h / 2)
-            if current_line_idx < len(self.lines):
-                # Display current line (centered vertically)
-                current_line = self.lines[current_line_idx]
-                line_num = h // 2 - 1  # Position for current line
-                line = current_line
-                while len(line) >= w - 1:
-                    if line_num < h:
-                        self.screen.insstr(line_num, 0, line[:w-1] + "\n")
-                        line = "  " + line[w - 1:]
-                        line_num += 1
-                    else:
-                        break
+        line_num = 0
+        for line_1 in self.lines[self.position:]:
+            line = line_1
+            while len(line) >= w - 1:
                 if line_num < h:
-                    self.screen.insstr(line_num, 0, line + "\n")
-                
-                # Display next line if available
-                if current_line_idx + 1 < len(self.lines):
-                    next_line = self.lines[current_line_idx + 1]
-                    line_num = h // 2 + 1  # Position for next line
-                    line = next_line
-                    while len(line) >= w - 1:
-                        if line_num < h:
-                            self.screen.insstr(line_num, 0, line[:w-1] + "\n")
-                            line = "  " + line[w - 1:]
-                            line_num += 1
-                        else:
-                            break
-                    if line_num < h:
-                        self.screen.insstr(line_num, 0, line + "\n")
-        else:
-            # Original display mode with multiple lines
-            line_num = 0
-            for line_1 in self.lines[self.position:]:
-                line = line_1
-                while len(line) >= w - 1:
-                    if line_num < h:
-                        self.screen.insstr(line_num, 0, line[:w-1] + "\n")
-                        line = "  " + line[w - 1:]
-                        line_num += 1
-                    else:
-                        break
-                if line_num < h:
-                    self.screen.insstr(line_num, 0, line + "\n")
+                    self.screen.insstr(line_num, 0, line[:w-1] + "\n")
+                    line = "  " + line[w - 1:]
+                    line_num += 1
                 else:
                     break
-                line_num += 1
-            while line_num < h:
-                self.screen.insstr(line_num, 0, "\n")
-                line_num += 1
-                
+            if line_num < h:
+                self.screen.insstr(line_num, 0, line + "\n")
+            else:
+                break
+            line_num += 1
+        while line_num < h:
+            self.screen.insstr(line_num, 0, "\n")
+            line_num += 1
         self.screen.refresh()
+
 
     def wait_input(self):
         """Handles user input and window resizing"""
@@ -116,10 +267,13 @@ class UI:
                 return True
         elif input_key == curses.KEY_DOWN:
             h, _ = self.screen.getmaxyx()
-            if self.position < len(self.lines) - h:
+            if self.position < len(self.lines) - h / 2:
                 self.position += 1
                 self.draw()
                 return True
+        elif input_key == curses.KEY_RESIZE:
+            self.draw()
+            return False
         return False
 
 
@@ -213,7 +367,11 @@ def main(screen, args):
     offline = args.offline
     minimal = args.minimal
 
-    ui = UI(screen, minimal)
+    # Choose UI based on minimal flag
+    if minimal:
+        ui = MinimalUI(screen)
+    else:
+        ui = UI(screen)
     run = False
 
     song_path, duration, position = cmus_status()
