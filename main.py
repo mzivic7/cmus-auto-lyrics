@@ -21,7 +21,7 @@ NOT_LYRICS = (
 class UI:
     """Methods used to draw terminal user interface"""
 
-    def __init__(self, screen):
+    def __init__(self, screen, minimal=False):
         curses.use_default_colors()
         curses.curs_set(0)
         screen.nodelay(True)
@@ -29,13 +29,12 @@ class UI:
         self.lines = []
         self.position = 0
         self.position_old = 0
-
+        self.minimal = minimal
 
     def update_lyrics(self, lyrics):
         """Loads lyrics"""
         self.lines = lyrics.split("\n")
         self.screen.clear()
-
 
     def scroll(self, song_duration, song_position):
         """Scrolls lyrics to position given from song duration"""
@@ -46,30 +45,65 @@ class UI:
             self.position_old = self.position
             self.draw()
 
-
     def draw(self):
         """Draws lyrics on screen"""
         h, w = self.screen.getmaxyx()
-        line_num = 0
-        for line_1 in self.lines[self.position:]:
-            line = line_1
-            while len(line) >= w - 1:
+        self.screen.clear()
+        
+        if self.minimal:
+            # Calculate the current line based on position and screen height
+            current_line_idx = self.position + int(h / 2)
+            if current_line_idx < len(self.lines):
+                # Display current line (centered vertically)
+                current_line = self.lines[current_line_idx]
+                line_num = h // 2 - 1  # Position for current line
+                line = current_line
+                while len(line) >= w - 1:
+                    if line_num < h:
+                        self.screen.insstr(line_num, 0, line[:w-1] + "\n")
+                        line = "  " + line[w - 1:]
+                        line_num += 1
+                    else:
+                        break
                 if line_num < h:
-                    self.screen.insstr(line_num, 0, line[:w-1] + "\n")
-                    line = "  " + line[w - 1:]
-                    line_num += 1
+                    self.screen.insstr(line_num, 0, line + "\n")
+                
+                # Display next line if available
+                if current_line_idx + 1 < len(self.lines):
+                    next_line = self.lines[current_line_idx + 1]
+                    line_num = h // 2 + 1  # Position for next line
+                    line = next_line
+                    while len(line) >= w - 1:
+                        if line_num < h:
+                            self.screen.insstr(line_num, 0, line[:w-1] + "\n")
+                            line = "  " + line[w - 1:]
+                            line_num += 1
+                        else:
+                            break
+                    if line_num < h:
+                        self.screen.insstr(line_num, 0, line + "\n")
+        else:
+            # Original display mode with multiple lines
+            line_num = 0
+            for line_1 in self.lines[self.position:]:
+                line = line_1
+                while len(line) >= w - 1:
+                    if line_num < h:
+                        self.screen.insstr(line_num, 0, line[:w-1] + "\n")
+                        line = "  " + line[w - 1:]
+                        line_num += 1
+                    else:
+                        break
+                if line_num < h:
+                    self.screen.insstr(line_num, 0, line + "\n")
                 else:
                     break
-            if line_num < h:
-                self.screen.insstr(line_num, 0, line + "\n")
-            else:
-                break
-            line_num += 1
-        while line_num < h:
-            self.screen.insstr(line_num, 0, "\n")
-            line_num += 1
+                line_num += 1
+            while line_num < h:
+                self.screen.insstr(line_num, 0, "\n")
+                line_num += 1
+                
         self.screen.refresh()
-
 
     def wait_input(self):
         """Handles user input and window resizing"""
@@ -82,14 +116,12 @@ class UI:
                 return True
         elif input_key == curses.KEY_DOWN:
             h, _ = self.screen.getmaxyx()
-            if self.position < len(self.lines) - h / 2:
+            if self.position < len(self.lines) - h:
                 self.position += 1
                 self.draw()
                 return True
-        elif input_key == curses.KEY_RESIZE:
-            self.draw()
-            return False
         return False
+
 
 
 def title_from_path(path):
@@ -179,8 +211,9 @@ def main(screen, args):
     save_tags = args.save_tags
     auto_scroll = args.auto_scroll
     offline = args.offline
+    minimal = args.minimal
 
-    ui = UI(screen)
+    ui = UI(screen, minimal)
     run = False
 
     song_path, duration, position = cmus_status()
@@ -257,6 +290,12 @@ def argparser():
         "--save-tags",
         action="store_true",
         help="save lyrics, artist, and title tags, if lyrics tag is missing",
+    )
+    parser.add_argument(
+        "-m",
+        "--minimal",
+        action="store_true",
+        help="minimal mode - shows only current and next line",
     )
     parser.add_argument(
         "-a",
