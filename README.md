@@ -8,6 +8,11 @@ Curses based lyrics display and fetcher for [cmus](https://cmus.github.io) music
 - Downloads lyrics from Genius (API token required)  
 - Downloads lyrics from azlyrics if Genius API token is not provided  
 - Automatically scrolls lyrics based on current position in song  
+- Center lines
+- Split too long lines on space
+- Custom color
+- Limit number of lyrics lines on screen
+- Supports lyrics with timestamps (`[11:22.333]`)
 - Saves lyrics, artist and title to tags (optional)  
 - Removes section headers from Genius lyrics (optional)  
 - Manual scroll deactivates auto scroll for current song  
@@ -15,20 +20,26 @@ Curses based lyrics display and fetcher for [cmus](https://cmus.github.io) music
 
 ## Usage
 ```
-usage: cmus-auto-lyrics [-h] [-c] [-s] [-a] [-o] [-v] [token]
+usage: cmus-auto-lyrics [-h] [-c] [-s] [-a] [-o] [-e] [-l INT] [--color INT] [--color_current INT] [-v] [token]
 
 Curses based lyrics display and fetcher for cmus music player
 
 arguments:
-  token                Genius API token - if not provided, will use azlyrics
+  token                 Genius API token - if not provided, will use azlyrics
 
 options:
-  -h, --help           show this help message and exit
-  -c, --clear-headers  clear section headers in lyrics
-  -s, --save-tags      save lyrics, artist, and title tags, if lyrics tag is missing
-  -a, --auto-scroll    automatically scroll lyrics based on current position in song
-  -o, --offline        runs in offline mode, only reads lyrics from tags
-  -v, --version        show program's version number and exit
+  -h, --help            show this help message and exit
+  -c, --clear-headers   clear section headers in lyrics, applies only for genius
+  -s, --save-tags       save lyrics, artist, and title tags, if lyrics tag is missing
+  -a, --auto-scroll     automatically scroll lyrics based on current position in song
+  -o, --offline         runs in offline mode - only reads lyrics from tags
+  -e, --center          center lyrics
+  -l, --limit_height INT
+                        limit number of lyrics lines visivble on screen, will center lyrics vertically
+  --color COLOR         8bit ANSI color code for all lyrics lines
+  --color_current COLOR_CURRENT
+                        8bit ANSI color code for current lyrics line (when timestamps are available)
+  -v, --version         show program's version number and exit
 
 ```
 
@@ -36,8 +47,11 @@ options:
 If there are no tags, keep file names as follows:  
 `<artist> - <title>.<extension>`  
 `<artist>-<title>.<extension>`  
-or file name is just song name and parent directory is artist:  
+or file name is just song title and parent directory is artist:  
 `<artist>/<title>.<extension>`  
+
+### Colors
+Colors are provided as integer and they are [8bit ANSI color codes](https://gist.github.com/ConnerWill/d4b6c776b509add763e17f9f113fd25b#256-colors). -1 is default terminal color.
 
 ## Installing
 - From AUR: `yay -S cmus-auto-lyrics`

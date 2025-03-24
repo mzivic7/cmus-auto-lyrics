@@ -1,6 +1,7 @@
 import argparse
 import curses
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -16,29 +17,38 @@ NOT_LYRICS = (
     "No Genius API token provided.",
     "No lyrics tag. Running in offline mode.",
 )
+MATCH_TIMESTAMP = re.compile(r"\[(\d{1,2}):(\d{1,2})\.(\d{1,3})\]")
 
 
 class UI:
     """Methods used to draw terminal user interface"""
 
-    def __init__(self, screen):
+    def __init__(self, screen, center=False, limit_h=None, color_1=-1, color_2=3):
         curses.use_default_colors()
         curses.curs_set(0)
         screen.nodelay(True)
         self.screen = screen
+        self.center = center
+        self.limit_h = limit_h + 1
         self.lines = []
         self.position = 0
         self.position_old = 0
+        self.highlighted = -1
+        curses.init_pair(1, color_1, -1)
+        curses.init_pair(2, color_2, -1)
+        self.color_normal = curses.color_pair(1)
+        self.color_highlighted = curses.color_pair(2) | curses.A_BOLD
 
 
     def update_lyrics(self, lyrics):
-        """Loads lyrics"""
-        self.lines = lyrics.split("\n")
+        """Load lyrics"""
+        self.lines = lyrics
+        self.highlighted = -1
         self.screen.clear()
 
 
-    def scroll(self, song_duration, song_position):
-        """Scrolls lyrics to position given from song duration"""
+    def scroll_by_duration(self, song_duration, song_position):
+        """Scroll lyrics to position given from song duration"""
         line_index = int((song_position * len(self.lines) / song_duration))
         h, _ = self.screen.getmaxyx()
         self.position = max(0, line_index - int(h / 2))
@@ -47,21 +57,44 @@ class UI:
             self.draw()
 
 
+    def scroll_by_index(self, line_index):
+        """Scroll lyrics to specified line index"""
+        h, _ = self.screen.getmaxyx()
+        if self.limit_h:
+            h = self.limit_h
+        self.highlighted = line_index
+        self.position = max(0, line_index - int(h / 2))
+        if self.position != self.position_old:
+            self.position_old = self.position
+            self.draw()
+
+
     def draw(self):
-        """Draws lyrics on screen"""
+        """Draw lyrics on screen"""
         h, w = self.screen.getmaxyx()
         line_num = 0
-        for line_1 in self.lines[self.position:]:
+        if self.limit_h:
+            line_num = int((h - self.limit_h) / 2)
+            h = self.limit_h + line_num
+        for num, line_1 in enumerate(self.lines[self.position:]):
+            if num == self.highlighted - self.position:
+                color = self.color_highlighted
+            else:
+                color = self.color_normal
             line = line_1
             while len(line) >= w - 1:
                 if line_num < h:
-                    self.screen.insstr(line_num, 0, line[:w-1] + "\n")
-                    line = "  " + line[w - 1:]
+                    newline_index = len(line[:w-1].rsplit(" ", 1)[0])
+                    this_line = line[:newline_index].center(w - 1)
+                    self.screen.insstr(line_num, 0, this_line + "\n", color)
+                    line = line[newline_index+1:]
                     line_num += 1
                 else:
                     break
             if line_num < h:
-                self.screen.insstr(line_num, 0, line + "\n")
+                if self.center:
+                    line = line.center(w - 1)
+                self.screen.insstr(line_num, 0, line.center(w - 1) + "\n", color)
             else:
                 break
             line_num += 1
@@ -72,7 +105,7 @@ class UI:
 
 
     def wait_input(self):
-        """Handles user input and window resizing"""
+        """Handle user input and window resizing"""
         h, _ = self.screen.getmaxyx()
         input_key = self.screen.getch()
         if input_key == curses.KEY_UP:
@@ -93,7 +126,7 @@ class UI:
 
 
 def title_from_path(path):
-    """Tries to get song artist and title from its path."""
+    """Try to get song artist and title from its path."""
     song_name = os.path.splitext(path)[0].strip("/").split("/")
     song_name_split = song_name[-1].split(" - ")
     if len(song_name_split) < 2:
@@ -109,7 +142,7 @@ def title_from_path(path):
 
 def get_lyrics(song_path, token, clear_headers=False, offline=False, artist=None, title=None):
     """
-    Tries to get song lyrics from tags then from web,
+    Try to get song lyrics from tags then from web,
     by reading artist and title from tags,
     alternatively guessing them from song file path and name.
     """
@@ -138,8 +171,35 @@ def get_lyrics(song_path, token, clear_headers=False, offline=False, artist=None
     return lyrics, artist, title
 
 
+def split_lyrics(lyrics):
+    """Try to split lyrics into timestamps list and lyrics list"""
+    timestamped = False
+    timestamps = []
+    lyrics = lyrics.split("\n")
+    for num, line in enumerate(lyrics):
+        timestamp = re.match(MATCH_TIMESTAMP, line)
+        if timestamp:
+            mins, secs, mils = map(int, timestamp.groups())
+            timestamps.append(mins * 60 + secs + (mils > 50))
+            timestamped = True
+            lyrics[num] = line[timestamp.end():]
+        else:
+            timestamps.append(None)
+    if timestamped:
+        return lyrics, timestamps
+    return lyrics, None
+
+
+def find_timestamp(timestamps, position):
+    """Fidnd timestamp index based on current song position"""
+    for num, timestamp in enumerate(timestamps):
+        if timestamp >= position:
+            return num
+    return 0
+
+
 def cmus_status():
-    """Gets song path, duration and position from cmus-remote"""
+    """Get song path, duration and position from cmus-remote"""
     proc = subprocess.Popen(["cmus-remote", "-Q"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
@@ -160,7 +220,7 @@ def cmus_status():
 
 
 def fill_tags(song_path, lyrics, artist, title):
-    """Saves lyrics, artist, and title tags, if lyrics tag is missing."""
+    """Save lyrics, artist, and title tags, if lyrics tag is missing."""
     if lyrics not in NOT_LYRICS:
         tags = music_tag.load_file(song_path)
         if len(str(tags["lyrics"])) < 16:
@@ -180,17 +240,21 @@ def main(screen, args):
     auto_scroll = args.auto_scroll
     offline = args.offline
 
-    ui = UI(screen)
+    ui = UI(screen, args.center, args.limit_height, args.color, args.color_current)
     run = False
 
     song_path, duration, position = cmus_status()
     if not song_path:
         sys.exit()
     lyrics, artist, title = get_lyrics(song_path, token, clear_headers, offline)
+    lyrics, timestamps = split_lyrics(lyrics)
     if save_tags:
         fill_tags(song_path, lyrics, artist, title)
     ui.update_lyrics(lyrics)
-    ui.scroll(duration, position)
+    if timestamps:
+        ui.scroll_by_index(find_timestamp(timestamps, position))
+    else:
+        ui.scroll_by_duration(duration, position)
     ui.draw()
 
     song_path_old = song_path
@@ -211,6 +275,7 @@ def main(screen, args):
                 break
             song_path_old = song_path
             lyrics, artist, title = get_lyrics(song_path, token, clear_headers, offline)
+            lyrics, timestamps = split_lyrics(lyrics)
             ui.update_lyrics(lyrics)
             ui.draw()
             disable_auto_scroll = False
@@ -219,7 +284,10 @@ def main(screen, args):
         if auto_scroll and not disable_auto_scroll:
             if position != position_old:
                 position_old = position
-                ui.scroll(duration, position)
+                if timestamps:
+                    ui.scroll_by_index(find_timestamp(timestamps, position))
+                else:
+                    ui.scroll_by_duration(duration, position)
                 ui.draw()
         key_pressed = ui.wait_input()
         if key_pressed:
@@ -229,12 +297,12 @@ def main(screen, args):
 
 
 def sigint_handler(signum, frame):   # noqa
-    """Handling Ctrl-C event"""
+    """Handle Ctrl-C event"""
     sys.exit()
 
 
 def argparser():
-    """Sets up argument parser for CLI"""
+    """Setup argument parser for CLI"""
     parser = argparse.ArgumentParser(
         prog="cmus-auto-lyrics",
         description="Curses based lyrics display and fetcher for cmus music player",
@@ -269,6 +337,30 @@ def argparser():
         "--offline",
         action="store_true",
         help="runs in offline mode - only reads lyrics from tags",
+    )
+    parser.add_argument(
+        "-e",
+        "--center",
+        action="store_true",
+        help="center lyrics",
+    )
+    parser.add_argument(
+        "-l",
+        "--limit_height",
+        type=int,
+        help="limit number of lyrics lines visivble on screen, will center lyrics vertically",
+    )
+    parser.add_argument(
+        "--color",
+        type=int,
+        default=-1,
+        help="8bit ANSI color code for all lyrics lines",
+    )
+    parser.add_argument(
+        "--color_current",
+        type=int,
+        default=3,
+        help="8bit ANSI color code for current lyrics line (when timestamps are available)",
     )
     parser.add_argument(
         "-v",
