@@ -29,7 +29,9 @@ class UI:
         screen.nodelay(True)
         self.screen = screen
         self.center = center
-        self.limit_h = limit_h + 1
+        self.limit_h = limit_h
+        if self.limit_h is not None:
+            self.limit_h += 1
         self.lines = []
         self.position = 0
         self.position_old = 0
@@ -366,7 +368,7 @@ def argparser():
         "-v",
         "--version",
         action="version",
-        version="%(prog)s 0.2.0",
+        version="%(prog)s 0.2.1",
     )
     return parser.parse_args()
 
