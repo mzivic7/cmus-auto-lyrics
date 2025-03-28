@@ -1,9 +1,12 @@
+import re
+
 import lyricsgenius
 from requests.exceptions import ConnectionError as requests_ConnectionError
 
 # https://github.com/johnwmillr/LyricsGenius
 
-blacklist = ["Contributors"]
+BLACKLIST = ["Contributors"]
+MATCH_HEADERS = re.compile(r"\[.+\]")
 
 
 def download(artist, title, token, clear_headers=False):
@@ -12,7 +15,7 @@ def download(artist, title, token, clear_headers=False):
     if not token:
         return "No Genius API token provided."
     genius = lyricsgenius.Genius(token)
-    genius.remove_section_headers = clear_headers
+    # genius.remove_section_headers = clear_headers   # wont replace headers with newline
     genius.excluded_terms = ["(Remix)", "instrumental"]
     genius.skip_non_songs = True
     genius.verbose = False
@@ -28,6 +31,10 @@ def download(artist, title, token, clear_headers=False):
             return "Lyrics not found."
     except requests_ConnectionError:
         return "No internet connection."
+
+    # remove headers
+    if clear_headers:
+        lyrics = re.sub(MATCH_HEADERS, "", lyrics)
 
     # clean lyrics
     lyrics = lyrics.replace(genius_title + " Lyrics", "")
@@ -52,7 +59,7 @@ def download(artist, title, token, clear_headers=False):
         if len(line) > 500:
             not_lyrics = True
             break
-        if any([x not in line for x in blacklist]):
+        if any([x not in line for x in BLACKLIST]):
             lyrics_new += line + "\n"
     lyrics = lyrics_new
 

@@ -87,7 +87,9 @@ class UI:
             while len(line) >= w - 1:
                 if line_num < h:
                     newline_index = len(line[:w-1].rsplit(" ", 1)[0])
-                    this_line = line[:newline_index].center(w - 1)
+                    this_line = line[:newline_index]
+                    if self.center:
+                        this_line = this_line.center(w - 1)
                     self.screen.insstr(line_num, 0, this_line + "\n", color)
                     line = line[newline_index+1:]
                     line_num += 1
@@ -96,7 +98,7 @@ class UI:
             if line_num < h:
                 if self.center:
                     line = line.center(w - 1)
-                self.screen.insstr(line_num, 0, line.center(w - 1) + "\n", color)
+                self.screen.insstr(line_num, 0, line + "\n", color)
             else:
                 break
             line_num += 1
@@ -248,10 +250,10 @@ def main(screen, args):
     song_path, duration, position = cmus_status()
     if not song_path:
         sys.exit()
-    lyrics, artist, title = get_lyrics(song_path, token, clear_headers, offline)
-    lyrics, timestamps = split_lyrics(lyrics)
+    lyrics_str, artist, title = get_lyrics(song_path, token, clear_headers, offline)
+    lyrics, timestamps = split_lyrics(lyrics_str)
     if save_tags:
-        fill_tags(song_path, lyrics, artist, title)
+        fill_tags(song_path, lyrics_str, artist, title)
     ui.update_lyrics(lyrics)
     if timestamps:
         ui.scroll_by_index(find_timestamp(timestamps, position))
@@ -276,13 +278,13 @@ def main(screen, args):
             if not song_path:
                 break
             song_path_old = song_path
-            lyrics, artist, title = get_lyrics(song_path, token, clear_headers, offline)
-            lyrics, timestamps = split_lyrics(lyrics)
+            lyrics_str, artist, title = get_lyrics(song_path, token, clear_headers, offline)
+            lyrics, timestamps = split_lyrics(lyrics_str)
             ui.update_lyrics(lyrics)
             ui.draw()
             disable_auto_scroll = False
             if save_tags:
-                fill_tags(song_path, lyrics, artist, title)
+                fill_tags(song_path, lyrics_str, artist, title)
         if auto_scroll and not disable_auto_scroll:
             if position != position_old:
                 position_old = position
@@ -368,7 +370,7 @@ def argparser():
         "-v",
         "--version",
         action="version",
-        version="%(prog)s 0.2.1",
+        version="%(prog)s 0.2.2",
     )
     return parser.parse_args()
 
