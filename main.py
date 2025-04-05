@@ -251,10 +251,10 @@ def main(screen, args):
     ui = UI(screen, args.center, args.limit_height, args.color, args.color_current)
     run = False
 
-    song_path = None
+    duration = -1
     timer = 0
     song_path, duration, position = cmus_status()
-    while not song_path and timer < 60:
+    while duration == -1 and timer < 60:
         timer += 1
         ui.update_lyrics(["cmus is not running"])
         ui.draw()
