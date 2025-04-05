@@ -209,9 +209,13 @@ def cmus_status():
                             stderr=subprocess.PIPE)
     output, error = proc.communicate()
     if error:
-        print(error.decode())
-        return None, None, None
+        if error.decode() == "cmus-remote: cmus is not running\n":
+            return None, -1, None
+        sys.exit(error.decode())
     status = output.decode().split("\n")
+    song_path = None
+    duration = None
+    position = None
     for line in status:
         line_split = line.split(" ")
         if line_split[0] == "file":
@@ -247,9 +251,16 @@ def main(screen, args):
     ui = UI(screen, args.center, args.limit_height, args.color, args.color_current)
     run = False
 
+    song_path = None
+    timer = 0
     song_path, duration, position = cmus_status()
-    if not song_path:
-        sys.exit()
+    while not song_path and timer < 60:
+        timer += 1
+        ui.update_lyrics(["cmus is not running"])
+        ui.draw()
+        time.sleep(1)
+        song_path, duration, position = cmus_status()
+
     lyrics_str, artist, title = get_lyrics(song_path, token, clear_headers, offline)
     lyrics, timestamps = split_lyrics(lyrics_str)
     if save_tags:
@@ -274,7 +285,7 @@ def main(screen, args):
         if timer >= check_status:
             song_path, duration, position = cmus_status()
             timer = 0
-        if song_path != song_path_old:
+        if song_path and song_path != song_path_old:
             if not song_path:
                 break
             song_path_old = song_path
@@ -285,7 +296,7 @@ def main(screen, args):
             disable_auto_scroll = False
             if save_tags:
                 fill_tags(song_path, lyrics_str, artist, title)
-        if auto_scroll and not disable_auto_scroll:
+        if duration and auto_scroll and not disable_auto_scroll:
             if position != position_old:
                 position_old = position
                 if timestamps:
@@ -293,6 +304,8 @@ def main(screen, args):
                 else:
                     ui.scroll_by_duration(duration, position)
                 ui.draw()
+        if duration == -1:
+            sys.exit()
         key_pressed = ui.wait_input()
         if key_pressed:
             disable_auto_scroll = True
